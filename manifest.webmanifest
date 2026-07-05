@@ -1,0 +1,15 @@
+{
+  "name": "Tap Tap Send",
+  "short_name": "Tap Tap Send",
+  "description": "Send money home — prototype",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#094A35",
+  "theme_color": "#094A35",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

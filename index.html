@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Tap Tap Send</title>
+
+<!-- PWA / iOS install -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Tap Tap Send" />
+<meta name="theme-color" content="#094A35" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" href="icon-192.png" />
+
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  --pine:#0E5C43;         /* brand green */
+  --pine-deep:#094A35;
+  --pine-bright:#12A06A;  /* action green */
+  --pine-glow:#16B67A;
+  --mint:#E8F5EF;
+  --coral:#E8503A;        /* single warm accent */
+  --ink:#0E1A16;
+  --muted:#6B7A73;
+  --line:#E7EAE7;
+  --bg:#F6F8F6;
+  --card:#FFFFFF;
+  --danger:#D64545;
+  --shadow:0 10px 30px rgba(9,74,53,.10);
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--ink);
+  overscroll-behavior:none;
+  -webkit-user-select:none;user-select:none;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+.tnum{font-variant-numeric:tabular-nums;}
+
+/* app shell = iPhone viewport */
+#app{
+  position:relative;height:100dvh;width:100%;max-width:480px;margin:0 auto;
+  background:var(--bg);overflow:hidden;
+}
+
+/* ============================================================
+   SCREENS (stacked, animated)
+   ============================================================ */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;
+  transform:translateX(0);transition:transform .34s cubic-bezier(.32,.72,0,1),opacity .34s;}
+.screen.hide-right{transform:translateX(100%);}
+.screen.hide-left{transform:translateX(-24%);opacity:.4;}
+.screen.hidden{display:none;}
+
+/* status bar spacer for the notch */
+.statuspad{height:calc(var(--safe-t) + 6px);flex:0 0 auto;}
+
+/* ============================================================
+   LOCK SCREEN
+   ============================================================ */
+#lock{
+  background:linear-gradient(165deg,#0E5C43 0%,#094A35 55%,#062A1E 100%);
+  color:#fff;align-items:center;justify-content:space-between;padding-bottom:calc(24px + var(--safe-b));
+}
+.lock-top{display:flex;flex-direction:column;align-items:center;margin-top:14vh;}
+.lock-logo{width:74px;height:74px;border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.35);}
+.lock-title{font-size:20px;font-weight:600;margin-top:16px;letter-spacing:-.2px;}
+.lock-sub{font-size:14px;color:rgba(255,255,255,.6);margin-top:4px;}
+.dots{display:flex;gap:16px;margin-top:34px;}
+.dot{width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(255,255,255,.55);transition:.15s;}
+.dot.on{background:#fff;border-color:#fff;transform:scale(1.05);}
+.dots.err{animation:shake .4s;}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+.lock-hint{font-size:12.5px;color:rgba(255,255,255,.45);margin-top:16px;height:16px;}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:22px 30px;width:min(300px,80%);}
+.key{aspect-ratio:1;max-width:74px;justify-self:center;width:100%;border-radius:50%;
+  background:rgba(255,255,255,.08);font-size:28px;font-weight:400;color:#fff;
+  display:flex;align-items:center;justify-content:center;transition:.1s;backdrop-filter:blur(4px);}
+.key:active{background:rgba(255,255,255,.22);transform:scale(.94);}
+.key.blank{background:none;pointer-events:none;}
+.key.util{font-size:14px;font-weight:500;background:none;}
+.key.face{font-size:26px;}
+
+/* ============================================================
+   TOP BAR (in-app)
+   ============================================================ */
+.topbar{display:flex;align-items:center;gap:12px;padding:6px 20px 10px;flex:0 0 auto;}
+.topbar h1{font-size:22px;font-weight:700;letter-spacing:-.4px;margin:0;flex:1;}
+.iconbtn{width:38px;height:38px;border-radius:50%;background:var(--card);
+  display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);}
+.back{font-size:22px;color:var(--pine);}
+
+/* scroll body */
+.body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px 120px;}
+
+/* ============================================================
+   HOME
+   ============================================================ */
+.hero{background:linear-gradient(150deg,var(--pine) 0%,var(--pine-deep) 100%);
+  border-radius:26px;padding:22px 22px 20px;color:#fff;box-shadow:0 14px 34px rgba(9,74,53,.28);position:relative;overflow:hidden;}
+.hero::after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;
+  background:radial-gradient(circle,rgba(22,182,122,.5),transparent 70%);}
+.hero .lbl{font-size:13px;color:rgba(255,255,255,.7);font-weight:500;}
+.hero .amt{font-size:40px;font-weight:800;letter-spacing:-1.2px;margin-top:6px;}
+.hero .amt small{font-size:20px;font-weight:600;opacity:.8;}
+.hero .row{display:flex;gap:20px;margin-top:16px;font-size:12.5px;color:rgba(255,255,255,.75);}
+.hero .row b{display:block;color:#fff;font-size:15px;font-weight:700;margin-top:2px;}
+
+.section-h{display:flex;align-items:baseline;justify-content:space-between;margin:26px 4px 12px;}
+.section-h h2{font-size:16px;font-weight:700;margin:0;letter-spacing:-.2px;}
+.section-h a{font-size:13px;color:var(--pine-bright);font-weight:600;}
+
+/* recipients rail */
+.rail{display:flex;gap:14px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none;}
+.rail::-webkit-scrollbar{display:none;}
+.recip{flex:0 0 auto;width:66px;text-align:center;}
+.ava{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:700;color:#fff;margin:0 auto 6px;box-shadow:var(--shadow);}
+.recip .nm{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.recip.add .ava{background:var(--mint);color:var(--pine);border:1.5px dashed var(--pine-bright);}
+
+/* txn list */
+.txn{display:flex;align-items:center;gap:13px;background:var(--card);border-radius:16px;
+  padding:13px 14px;margin-bottom:10px;box-shadow:var(--shadow);}
+.txn .ava{width:44px;height:44px;font-size:16px;margin:0;flex:0 0 auto;box-shadow:none;}
+.txn .mid{flex:1;min-width:0;}
+.txn .mid .t1{font-size:14.5px;font-weight:600;}
+.txn .mid .t2{font-size:12px;color:var(--muted);margin-top:2px;}
+.txn .right{text-align:right;flex:0 0 auto;}
+.txn .right .v{font-size:14.5px;font-weight:700;}
+.pill{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:3px;}
+.pill.ok{background:#E4F6EC;color:#137a4e;}
+.pill.pend{background:#FFF3DA;color:#9a6b00;}
+.pill.fail{background:#FDE6E6;color:#b62c2c;}
+
+.month-h{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:18px 4px 10px;}
+.empty{text-align:center;color:var(--muted);padding:60px 20px;font-size:14px;}
+
+/* ---- real-app style activity/transaction rows (grey circle + check/X) ---- */
+.searchbar{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:30px;
+  padding:13px 18px;margin:2px 0 8px;background:var(--card);}
+.searchbar svg{width:20px;height:20px;stroke:var(--muted);flex:0 0 auto;}
+.searchbar input{border:none;outline:none;flex:1;font-size:16px;font-family:inherit;background:none;color:var(--ink);-webkit-user-select:text;user-select:text;}
+.searchbar input::placeholder{color:#9aa8a1;}
+.arow{display:flex;align-items:center;gap:14px;padding:16px 2px;cursor:pointer;}
+.arow:active{background:#fafbfa;}
+.acircle{width:48px;height:48px;border-radius:50%;background:#EFF1EF;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.acircle svg{width:24px;height:24px;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;}
+.acircle.ok svg{stroke:#3E8B63;}
+.acircle.fail svg{stroke:#D64545;}
+.acircle.pend svg{stroke:#C08A2E;}
+.arow .amid{flex:1;min-width:0;}
+.arow .anm{font-size:16px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.arow .ast{font-size:14px;color:var(--muted);margin-top:2px;}
+.arow .aright{text-align:right;flex:0 0 auto;}
+.arow .aval{font-size:16px;font-weight:700;color:var(--ink);}
+.arow .adate{font-size:13.5px;color:var(--muted);margin-top:2px;white-space:nowrap;}
+.no-results{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px;}
+
+/* ---- referrals ---- */
+.ref-hero{background:linear-gradient(150deg,var(--pine) 0%,var(--pine-deep) 100%);border-radius:24px;padding:26px 22px;color:#fff;text-align:center;box-shadow:0 14px 34px rgba(9,74,53,.28);}
+.ref-hero .gift{font-size:40px;}
+.ref-hero h2{font-size:20px;font-weight:800;margin:12px 0 6px;letter-spacing:-.3px;}
+.ref-hero p{font-size:13.5px;color:rgba(255,255,255,.78);margin:0;line-height:1.5;}
+.ref-code{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(255,255,255,.14);
+  border:1px dashed rgba(255,255,255,.5);border-radius:14px;padding:14px 16px;margin-top:18px;}
+.ref-code .code{font-size:19px;font-weight:800;letter-spacing:2px;}
+.ref-code button{background:#fff;color:var(--pine-deep);font-weight:700;font-size:13px;padding:8px 14px;border-radius:20px;}
+.ref-step{display:flex;gap:14px;align-items:flex-start;padding:14px 2px;}
+.ref-step .n{width:28px;height:28px;border-radius:50%;background:var(--mint);color:var(--pine);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.ref-step .rt{font-size:14.5px;font-weight:600;}
+.ref-step .rt small{display:block;color:var(--muted);font-weight:400;font-size:12.5px;margin-top:2px;}
+
+/* ============================================================
+   BOTTOM TAB BAR
+   ============================================================ */
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:calc(64px + var(--safe-b));
+  padding-bottom:var(--safe-b);background:rgba(255,255,255,.86);backdrop-filter:blur(18px);
+  border-top:1px solid var(--line);display:flex;align-items:center;z-index:40;}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:10.5px;font-weight:600;height:64px;justify-content:center;}
+.tab svg{width:24px;height:24px;}
+.tab.on{color:var(--pine);}
+.tab.send{position:relative;}
+.fab{width:56px;height:56px;border-radius:50%;background:linear-gradient(145deg,var(--pine-glow),var(--pine));
+  display:flex;align-items:center;justify-content:center;color:#fff;margin-top:-26px;
+  box-shadow:0 10px 22px rgba(14,92,67,.4);}
+.fab svg{width:26px;height:26px;}
+
+/* ============================================================
+   SEND FLOW
+   ============================================================ */
+.flow{background:var(--bg);}
+.step{flex:1;overflow-y:auto;padding:0 20px 24px;display:flex;flex-direction:column;}
+.progress{display:flex;gap:6px;padding:0 20px 14px;}
+.progress span{flex:1;height:4px;border-radius:4px;background:var(--line);transition:.3s;}
+.progress span.on{background:var(--pine-bright);}
+
+/* amount step */
+.amt-wrap{text-align:center;margin-top:8px;}
+.amt-lbl{font-size:13px;color:var(--muted);font-weight:600;}
+.amt-big{font-size:56px;font-weight:800;letter-spacing:-2px;margin:6px 0;color:var(--ink);}
+.amt-big .cur{color:var(--muted);font-weight:700;}
+.convert{background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);margin:8px auto 0;max-width:320px;}
+.convert .cline{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;color:var(--muted);}
+.convert .cline b{color:var(--ink);font-weight:700;}
+.convert .they{border-top:1px dashed var(--line);margin-top:6px;padding-top:10px;}
+.convert .they .big{font-size:19px;color:var(--pine);font-weight:800;}
+
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:auto;padding-top:16px;}
+.nk{padding:16px 0;font-size:24px;font-weight:600;border-radius:14px;background:var(--card);box-shadow:var(--shadow);transition:.1s;}
+.nk:active{background:var(--mint);transform:scale(.96);}
+
+/* recipient step */
+.rlist .txn{cursor:pointer;}
+.rlist .txn.sel{outline:2px solid var(--pine-bright);}
+.method-tag{font-size:11px;color:var(--muted);}
+
+/* review step */
+.review-card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:6px 18px;margin-top:8px;}
+.rrow{display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-bottom:1px solid var(--line);font-size:14px;}
+.rrow:last-child{border-bottom:none;}
+.rrow .k{color:var(--muted);}
+.rrow .v{font-weight:700;text-align:right;}
+.rrow .v small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;}
+.total-card{background:var(--mint);border-radius:16px;padding:16px 18px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;}
+.total-card .k{font-size:13px;color:var(--pine-deep);font-weight:600;}
+.total-card .v{font-size:22px;font-weight:800;color:var(--pine-deep);}
+
+/* method chips */
+.chips{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.chip{padding:9px 14px;border-radius:20px;background:var(--card);box-shadow:var(--shadow);font-size:13px;font-weight:600;color:var(--muted);}
+.chip.on{background:var(--pine);color:#fff;}
+
+/* tap-tap confirm step */
+.tap-step{align-items:center;justify-content:center;text-align:center;}
+.tap-lead{font-size:20px;font-weight:700;letter-spacing:-.3px;}
+.tap-sub{font-size:14px;color:var(--muted);margin-top:8px;max-width:260px;}
+.tapbtn{position:relative;width:220px;height:220px;border-radius:50%;margin:40px auto;
+  background:linear-gradient(145deg,var(--pine-glow),var(--pine));color:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  box-shadow:0 18px 44px rgba(14,92,67,.45);transition:transform .12s;}
+.tapbtn:active{transform:scale(.95);}
+.tapbtn .big{font-size:22px;font-weight:800;}
+.tapbtn .sm{font-size:12.5px;opacity:.85;}
+.tapbtn.armed{animation:pulse 1s infinite;}
+@keyframes pulse{0%{box-shadow:0 18px 44px rgba(14,92,67,.45),0 0 0 0 rgba(22,182,122,.5);}
+  70%{box-shadow:0 18px 44px rgba(14,92,67,.45),0 0 0 26px rgba(22,182,122,0);}100%{box-shadow:0 18px 44px rgba(14,92,67,.45),0 0 0 0 rgba(22,182,122,0);}}
+.ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.5);transform:scale(0);animation:rip .6s ease-out;pointer-events:none;}
+@keyframes rip{to{transform:scale(3);opacity:0;}}
+.tap-counter{font-size:13px;color:var(--pine);font-weight:700;height:18px;}
+
+/* success */
+.success{align-items:center;justify-content:center;text-align:center;background:linear-gradient(180deg,#F6F8F6,#EAF6EF);}
+.check-wrap{width:110px;height:110px;border-radius:50%;background:var(--pine-bright);display:flex;align-items:center;justify-content:center;box-shadow:0 14px 34px rgba(18,160,106,.4);animation:pop .5s cubic-bezier(.2,1.4,.4,1);}
+@keyframes pop{0%{transform:scale(0)}100%{transform:scale(1)}}
+.check-wrap svg{width:56px;height:56px;stroke:#fff;stroke-width:5;fill:none;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:60;stroke-dashoffset:60;animation:draw .4s .2s forwards;}
+@keyframes draw{to{stroke-dashoffset:0;}}
+.success h2{font-size:24px;margin:22px 0 6px;font-weight:800;letter-spacing:-.4px;}
+.success p{color:var(--muted);font-size:14px;margin:0;}
+.receipt{background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:6px 18px;margin:24px 0;width:100%;max-width:320px;text-align:left;}
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+.set-group{background:var(--card);border-radius:16px;box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;}
+.set-row{display:flex;align-items:center;gap:12px;padding:15px 16px;border-bottom:1px solid var(--line);font-size:14.5px;}
+.set-row:last-child{border-bottom:none;}
+.set-row .ic{width:30px;height:30px;border-radius:8px;background:var(--mint);display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 auto;}
+.set-row .lab{flex:1;}
+.set-row .lab small{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:1px;}
+.set-row .chev{color:#c4ccc7;font-size:18px;}
+.group-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 4px 8px;}
+
+/* toggle */
+.toggle{width:50px;height:30px;border-radius:30px;background:var(--line);position:relative;transition:.2s;flex:0 0 auto;}
+.toggle.on{background:var(--pine-bright);}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 2px 4px rgba(0,0,0,.2);}
+.toggle.on::after{left:23px;}
+
+/* segmented */
+.seg{display:flex;background:var(--line);border-radius:12px;padding:3px;gap:3px;}
+.seg button{flex:1;padding:8px 4px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--muted);}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+
+/* primary CTA */
+.cta{margin:auto 20px 0;padding:16px;border-radius:16px;background:linear-gradient(145deg,var(--pine-glow),var(--pine));
+  color:#fff;font-size:16px;font-weight:700;text-align:center;box-shadow:0 10px 24px rgba(14,92,67,.35);transition:.12s;}
+.cta:active{transform:scale(.98);}
+.cta.disabled{background:#c9d2cd;box-shadow:none;pointer-events:none;}
+.cta-wrap{padding-bottom:calc(16px + var(--safe-b));flex:0 0 auto;}
+
+/* sheet (change PIN) */
+.sheet-scrim{position:absolute;inset:0;background:rgba(6,32,24,.5);z-index:60;opacity:0;pointer-events:none;transition:.25s;}
+.sheet-scrim.on{opacity:1;pointer-events:auto;}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:24px 24px 0 0;
+  padding:22px 22px calc(28px + var(--safe-b));z-index:61;transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);max-width:480px;margin:0 auto;}
+.sheet.on{transform:translateY(0);}
+.sheet h3{margin:0 0 4px;font-size:18px;font-weight:700;}
+.sheet p{margin:0 0 18px;color:var(--muted);font-size:13.5px;}
+.sheet .dots{justify-content:center;margin:20px 0 4px;}
+.sheet .keypad{margin:14px auto 0;}
+.sheet .key{background:var(--bg);color:var(--ink);}
+.sheet .key.util{background:none;color:var(--pine);}
+
+.toast{position:absolute;left:50%;bottom:calc(90px + var(--safe-b));transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:#fff;padding:11px 18px;border-radius:24px;font-size:13px;font-weight:600;opacity:0;transition:.25s;z-index:70;pointer-events:none;white-space:nowrap;}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+</head>
+<body>
+<div id="app"><!-- screens injected here --></div>
+
+<script>
+/* ================================================================
+   DEMO DATA  —  ✏️  EDIT THIS BLOCK TO DROP IN YOUR REAL HISTORY
+   ----------------------------------------------------------------
+   • Everything the app shows comes from here.
+   • amountEUR = what you paid.  The app computes BDT from RATE.
+   • status: "ok" (Delivered) | "pend" (Processing) | "fail" (Failed)
+   • method: "bKash" | "Nagad" | "Bank" | "Cash pickup"
+   ================================================================ */
+const RATE = 137.20;          // 1 EUR -> BDT (illustrative)
+const FEE  = 1.99;            // flat fee in EUR (illustrative)
+
+const PROFILE = {
+  name: "Badhan",
+  from: "Germany",
+  currency: "EUR",
+  symbol: "€",
+  sentTotal: 0,               // computed below from delivered transfers
+  transfers: 0
+};
+
+// avatar colors cycle for recipients
+const AV = ["#0E5C43","#12A06A","#E8503A","#3A6EA8","#8E5AB8","#C08A2E","#2E8B8B","#B8663A","#4A7A2E","#A83A6E"];
+
+// recipient directory — city + delivery method used in the send flow & receipts
+const RECIP_META = [
+  { name:"Umma Tamema Priyanka", city:"Dhaka",      method:"bKash",       acct:"•• 4471" },
+  { name:"Atik Israte Alok",     city:"Chattogram", method:"bKash",       acct:"•• 8820" },
+  { name:"Wasif Salam",          city:"Dhaka",      method:"Nagad",       acct:"•• 1093" },
+  { name:"Goutam Dey",           city:"Sylhet",     method:"bKash",       acct:"•• 2276" },
+  { name:"A K Fazlul Hoque",     city:"Dhaka",      method:"Bank",        acct:"•• 5510" },
+  { name:"Rahela Khatun",        city:"Khulna",     method:"bKash",       acct:"•• 3390" },
+  { name:"Mohammad Habibullah",  city:"Dhaka",      method:"Bank",        acct:"•• 7042" },
+  { name:"M M Abu Musanna",      city:"Rajshahi",   method:"Nagad",       acct:"•• 6118" },
+  { name:"Fazlul Hoque",         city:"Dhaka",      method:"Bank",        acct:"•• 9004" },
+  { name:"Nazma Begum",          city:"Barishal",   method:"Cash pickup", acct:"Agent" },
+  { name:"S. M. Badhan",         city:"Dhaka",      method:"bKash",       acct:"•• 1200" },
+  { name:"Tazria Nahar",         city:"Dhaka",      method:"bKash",       acct:"•• 8875" },
+  { name:"Samapti Mondol",       city:"Khulna",     method:"Nagad",       acct:"•• 4463" },
+  { name:"Nisha Sharma",         city:"Sylhet",     method:"bKash",       acct:"•• 3321" },
+];
+
+/* Real history, newest first.  [name, amountEUR, status, date]
+   status: "ok" = Delivered · "fail" = Failed · "pend" = Processing        */
+const RAW_TX = [
+  ["Umma Tamema Priyanka",140.00,"ok","2026-07-04"],
+  ["Atik Israte Alok",     75.00,"ok","2026-06-26"],
+  ["Atik Israte Alok",     73.00,"fail","2026-06-25"],
+  ["Atik Israte Alok",     35.80,"fail","2026-06-23"],
+  ["Atik Israte Alok",     43.00,"ok","2026-06-22"],
+  ["Atik Israte Alok",     40.00,"fail","2026-06-22"],
+  ["Atik Israte Alok",     40.00,"fail","2026-06-21"],
+  ["Atik Israte Alok",     40.00,"fail","2026-06-21"],
+  ["Wasif Salam",          15.00,"ok","2026-06-10"],
+  ["Umma Tamema Priyanka", 36.00,"ok","2026-06-10"],
+  ["Goutam Dey",           36.37,"ok","2026-06-08"],
+  ["Umma Tamema Priyanka", 43.00,"ok","2026-06-04"],
+  ["Umma Tamema Priyanka",119.13,"ok","2026-05-29"],
+  ["A K Fazlul Hoque",    456.00,"ok","2026-05-27"],
+  ["Wasif Salam",          23.83,"ok","2026-05-27"],
+  ["Rahela Khatun",       105.00,"ok","2026-05-03"],
+  ["Rahela Khatun",       105.00,"fail","2026-05-03"],
+  ["Mohammad Habibullah", 140.00,"ok","2026-04-30"],
+  ["Rahela Khatun",       300.00,"ok","2026-03-31"],
+  ["Wasif Salam",          11.00,"ok","2026-03-22"],
+  ["M M Abu Musanna",      11.00,"ok","2026-03-22"],
+  ["Wasif Salam",          22.00,"ok","2026-03-21"],
+  ["M M Abu Musanna",     106.39,"ok","2026-03-13"],
+  ["M M Abu Musanna",      85.50,"ok","2026-03-05"],
+  ["Rahela Khatun",       400.00,"ok","2026-02-28"],
+  ["Rahela Khatun",       400.00,"fail","2026-02-28"],
+  ["Rahela Khatun",       343.00,"ok","2026-01-29"],
+  ["Fazlul Hoque",         35.00,"ok","2026-01-28"],
+  ["Fazlul Hoque",         35.00,"fail","2026-01-28"],
+  ["Wasif Salam",          46.50,"ok","2026-01-15"],
+  ["Goutam Dey",           38.01,"ok","2026-01-13"],
+  ["Wasif Salam",          31.80,"ok","2025-12-18"],
+  ["Wasif Salam",          31.80,"fail","2025-12-18"],
+  ["Wasif Salam",          31.80,"fail","2025-12-18"],
+  ["Nazma Begum",          17.88,"ok","2025-12-07"],
+  ["Wasif Salam",          12.00,"ok","2025-11-17"],
+  ["Wasif Salam",          12.00,"fail","2025-11-17"],
+  ["Wasif Salam",          12.00,"fail","2025-11-17"],
+  ["Goutam Dey",           40.00,"ok","2025-11-11"],
+  ["A K Fazlul Hoque",    385.00,"ok","2025-10-27"],
+  ["Wasif Salam",          22.00,"ok","2025-10-27"],
+  ["Goutam Dey",           39.00,"ok","2025-09-09"],
+  ["M M Abu Musanna",      20.00,"ok","2025-08-02"],
+  ["M M Abu Musanna",      19.00,"fail","2025-08-02"],
+  ["Goutam Dey",           40.00,"ok","2025-07-09"],
+  ["Goutam Dey",           40.00,"fail","2025-07-09"],
+  ["A K Fazlul Hoque",    380.00,"fail","2025-06-28"],
+  ["A K Fazlul Hoque",    435.00,"ok","2025-05-28"],
+  ["M M Abu Musanna",      44.00,"ok","2025-05-24"],
+  ["M M Abu Musanna",      44.00,"fail","2025-05-24"],
+  ["S. M. Badhan",         72.00,"ok","2025-04-29"],
+  ["S. M. Badhan",         72.00,"fail","2025-04-29"],
+  ["A K Fazlul Hoque",    295.00,"ok","2025-04-29"],
+  ["Tazria Nahar",         21.00,"ok","2025-04-21"],
+  ["Samapti Mondol",       12.00,"ok","2025-02-02"],
+  ["S. M. Badhan",         79.00,"ok","2025-01-26"],
+  ["A K Fazlul Hoque",   1182.00,"ok","2025-01-26"],
+  ["Tazria Nahar",        113.00,"ok","2025-01-25"],
+  ["Tazria Nahar",         16.00,"ok","2025-01-25"],
+  ["Fazlul Hoque",         80.00,"ok","2025-01-23"],
+  ["M M Abu Musanna",      16.00,"ok","2025-01-18"],
+  ["Tazria Nahar",         34.00,"ok","2025-01-18"],
+  ["Tazria Nahar",         28.00,"ok","2024-12-29"],
+  ["Nisha Sharma",         18.88,"ok","2024-12-07"],
+  ["Tazria Nahar",         77.00,"ok","2024-12-06"],
+  ["A K Fazlul Hoque",    440.00,"ok","2024-11-28"],
+  ["A K Fazlul Hoque",    400.00,"ok","2024-10-31"],
+  ["Tazria Nahar",         92.00,"ok","2024-10-31"],
+  ["Tazria Nahar",         43.00,"ok","2024-10-09"],
+];
+
+// ---- build recipient list (with ids + colors) from the directory ----
+const nameKey = s => s.trim().toLowerCase().replace(/\s+/g," ");
+const RECIPIENTS = RECIP_META.map((m,i)=>({ id:"r"+(i+1), ...m, _key:nameKey(m.name) }));
+const KEY2ID = Object.fromEntries(RECIPIENTS.map(r=>[r._key, r.id]));
+
+// ---- build transactions, linking each to a recipient id ----
+let TRANSACTIONS = RAW_TX.map((row,i)=>{
+  const [name, amt, status, date] = row;
+  const id = KEY2ID[nameKey(name)];
+  const r  = RECIPIENTS.find(x=>x.id===id);
+  return { id:"t"+(RAW_TX.length-i), to:id, amountEUR:amt, method:r?r.method:"bKash", date, status };
+});
+
+// ---- compute hero totals from delivered transfers ----
+function recomputeTotals(){
+  const ok = TRANSACTIONS.filter(t=>t.status==="ok");
+  PROFILE.sentTotal = ok.reduce((s,t)=>s+t.amountEUR,0);
+  PROFILE.transfers = ok.length;
+}
+recomputeTotals();
+
+/* ================================================================
+   STATE + PERSISTENCE  (localStorage with safe fallback)
+   ================================================================ */
+const DEFAULT_CONFIG = { pin:"1234", faceId:true, autoLock:"1m", requirePinToSend:false, setup:true };
+let CONFIG = load("tts_config", DEFAULT_CONFIG);
+let savedTx = load("tts_tx", null);
+if (savedTx) { TRANSACTIONS = savedTx; recomputeTotals(); }
+
+function load(k, fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } }
+function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function persist(){ save("tts_config", CONFIG); save("tts_tx", TRANSACTIONS); }
+
+/* ================================================================
+   HELPERS
+   ================================================================ */
+const $ = (s,el=document)=>el.querySelector(s);
+const app = $("#app");
+const recip = id => RECIPIENTS.find(r=>r.id===id) || {name:"Unknown",city:"",method:"",acct:""};
+const avColor = id => AV[(RECIPIENTS.findIndex(r=>r.id===id)+AV.length)%AV.length];
+const initials = n => n.split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+const eur = n => "€"+Number(n).toLocaleString("en",{minimumFractionDigits:0,maximumFractionDigits:2});
+const eur2 = n => "€"+Number(n).toLocaleString("en",{minimumFractionDigits:2,maximumFractionDigits:2});
+const bdt = n => "৳"+Math.round(n).toLocaleString("en");
+const fmtDate = iso => new Date(iso).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+const monthKey = iso => new Date(iso).toLocaleDateString("en",{month:"long",year:"numeric"});
+// real-app style: "Today" / "a day ago" / "N days ago" / "Month D, YYYY"
+function relDate(iso){
+  const d=new Date(iso+"T00:00:00"), now=new Date();
+  const days=Math.round((new Date(now.getFullYear(),now.getMonth(),now.getDate())-d)/86400000);
+  if(days<=0) return "Today";
+  if(days===1) return "a day ago";
+  if(days<7)  return days+" days ago";
+  return d.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
+}
+function haptic(ms=12){ try{ navigator.vibrate && navigator.vibrate(ms); }catch(e){} }
+function toast(msg){ let t=$(".toast"); if(!t){t=document.createElement("div");t.className="toast";app.appendChild(t);}
+  t.textContent=msg;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),1800);}
+
+const STATUS = {ok:{c:"ok",t:"Delivered"},pend:{c:"pend",t:"Processing"},fail:{c:"fail",t:"Failed"}};
+const METHOD_ICON = {bKash:"📲",Nagad:"📱",Bank:"🏦","Cash pickup":"🏪"};
+
+/* ================================================================
+   SCREEN ROUTER
+   ================================================================ */
+let currentTab = "home";
+let unlocked = false;
+let lockTimer = null;
+
+function render(){
+  if(!unlocked){ app.innerHTML = LockScreen(); bindLock(); return; }
+  app.innerHTML = `
+    ${ currentTab==="home"     ? HomeScreen()      : "" }
+    ${ currentTab==="activity" ? ActivityScreen()  : "" }
+    ${ currentTab==="referrals"? ReferralsScreen() : "" }
+    ${ currentTab==="settings" ? SettingsScreen()  : "" }
+    ${ TabBar() }`;
+  bindMain();
+}
+
+/* ---------------- LOCK ---------------- */
+let pinBuf = "";
+function LockScreen(){
+  return `<div class="screen" id="lock">
+    <div class="lock-top">
+      <img class="lock-logo" src="icon-192.png" alt=""/>
+      <div class="lock-title">Tap Tap Send</div>
+      <div class="lock-sub">Enter your passcode</div>
+      <div class="dots" id="dots">${[0,1,2,3].map(i=>`<div class="dot"></div>`).join("")}</div>
+      <div class="lock-hint" id="hint"></div>
+    </div>
+    <div class="keypad" id="keypad">
+      ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="key" data-n="${n}">${n}</button>`).join("")}
+      <button class="key face" data-act="face" title="Face ID">${CONFIG.faceId?faceSvg():""}</button>
+      <button class="key" data-n="0">0</button>
+      <button class="key util" data-act="del">Delete</button>
+    </div>
+  </div>`;
+}
+function bindLock(){
+  pinBuf="";
+  const dots=$("#dots"), hint=$("#hint");
+  const draw=()=>[...dots.children].forEach((d,i)=>d.classList.toggle("on",i<pinBuf.length));
+  $("#keypad").addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b)return; haptic();
+    if(b.dataset.act==="del"){ pinBuf=pinBuf.slice(0,-1); draw(); return; }
+    if(b.dataset.act==="face"){ hint.textContent="Face ID… ✓"; setTimeout(unlock,450); return; }
+    if(pinBuf.length>=4)return;
+    pinBuf+=b.dataset.n; draw();
+    if(pinBuf.length===4){
+      setTimeout(()=>{
+        if(pinBuf===CONFIG.pin){ unlock(); }
+        else{ dots.classList.add("err"); hint.textContent="Wrong passcode"; haptic(200);
+          setTimeout(()=>{pinBuf="";draw();dots.classList.remove("err");hint.textContent="";},600); }
+      },120);
+    }
+  });
+}
+function unlock(){ unlocked=true; currentTab="home"; render(); armAutoLock(); }
+function lock(){ unlocked=false; render(); }
+function armAutoLock(){
+  clearTimeout(lockTimer);
+  const map={"immediate":0,"1m":60000,"5m":300000,"never":null};
+  const ms=map[CONFIG.autoLock];
+  if(ms===null)return;
+  // lock on visibility change / timeout
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden && unlocked && CONFIG.autoLock!=="never"){
+    if(CONFIG.autoLock==="immediate"){ lock(); }
+    else { const m={"1m":60000,"5m":300000}[CONFIG.autoLock]||60000;
+      lockTimer=setTimeout(()=>{ if(document.hidden) lock(); }, m); }
+  }
+});
+
+/* ---------------- HOME ---------------- */
+function topRecipients(n){
+  const count={};
+  TRANSACTIONS.forEach(t=>{ count[t.to]=(count[t.to]||0)+1; });
+  return RECIPIENTS.filter(r=>count[r.id]).sort((a,b)=>count[b.id]-count[a.id]).slice(0,n);
+}
+function HomeScreen(){
+  const recent = TRANSACTIONS.slice(0,4);
+  const rail = topRecipients(6);
+  return `<div class="screen" id="home">
+    <div class="statuspad"></div>
+    <div class="topbar"><h1>Hi, ${PROFILE.name}</h1>
+      <button class="iconbtn" data-go="settings" aria-label="Settings">⚙️</button></div>
+    <div class="body">
+      <div class="hero">
+        <div class="lbl">Total sent home</div>
+        <div class="amt tnum">${eur(PROFILE.sentTotal)}</div>
+        <div class="row">
+          <div>Transfers<b class="tnum">${PROFILE.transfers}</b></div>
+          <div>Rate today<b class="tnum">1 € = ${RATE} ৳</b></div>
+          <div>To<b>🇧🇩 Bangladesh</b></div>
+        </div>
+      </div>
+
+      <div class="section-h"><h2>Send again</h2></div>
+      <div class="rail">
+        ${rail.map(r=>`
+          <button class="recip" data-send="${r.id}">
+            <div class="ava" style="background:${avColor(r.id)}">${initials(r.name)}</div>
+            <div class="nm">${r.name.trim().split(/\s+/).pop()}</div></button>`).join("")}
+        <button class="recip add" data-send="new">
+          <div class="ava">+</div><div class="nm">New</div></button>
+      </div>
+
+      <div class="section-h"><h2>Recent activity</h2><a data-go="activity">See all</a></div>
+      ${recent.map(txnRow).join("")}
+    </div>
+    <div style="position:absolute;left:20px;right:20px;bottom:calc(78px + var(--safe-b));z-index:35">
+      <div class="cta" data-send="new">Send money</div>
+    </div>
+  </div>`;
+}
+
+const CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>';
+const X_SVG     = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+const CLOCK_SVG = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
+const STATUS_ICON = { ok:CHECK_SVG, fail:X_SVG, pend:CLOCK_SVG };
+
+function txnRow(t){
+  const r=recip(t.to), s=STATUS[t.status];
+  return `<div class="arow" data-txn="${t.id}" data-name="${r.name.toLowerCase()}">
+    <div class="acircle ${s.c}">${STATUS_ICON[t.status]}</div>
+    <div class="amid">
+      <div class="anm">${r.name}</div>
+      <div class="ast">${s.t}</div>
+    </div>
+    <div class="aright">
+      <div class="aval tnum">${eur2(t.amountEUR)}</div>
+      <div class="adate">${relDate(t.date)}</div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- ACTIVITY ---------------- */
+function ActivityScreen(){
+  const rows = TRANSACTIONS.length
+    ? TRANSACTIONS.map(txnRow).join("")
+    : `<div class="empty">No transfers yet.<br>Tap Send to make your first one.</div>`;
+  return `<div class="screen" id="activity">
+    <div class="statuspad"></div>
+    <div class="topbar"><h1>Activity</h1></div>
+    <div class="body">
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="actsearch" type="text" placeholder="Search by recipient name" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"/>
+      </div>
+      <div id="actlist">${rows}</div>
+      <div class="no-results" id="noresults" style="display:none">No transfers match that name.</div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- SETTINGS ---------------- */
+function SettingsScreen(){
+  const lockLabels={immediate:"Immediately","1m":"After 1 min","5m":"After 5 min",never:"Never"};
+  return `<div class="screen" id="settings">
+    <div class="statuspad"></div>
+    <div class="topbar"><h1>Settings</h1></div>
+    <div class="body">
+      <div class="set-row" style="border-radius:16px;box-shadow:var(--shadow);background:var(--card);margin-bottom:20px">
+        <div class="ava" style="width:46px;height:46px;background:${AV[0]};box-shadow:none">${initials(PROFILE.name)}</div>
+        <div class="lab" style="font-weight:700;font-size:16px">${PROFILE.name}<small>${PROFILE.from} · ${PROFILE.currency}</small></div>
+      </div>
+
+      <div class="group-title">Lock configuration</div>
+      <div class="set-group">
+        <button class="set-row" data-act="changepin" style="width:100%;text-align:left">
+          <div class="ic">🔑</div><div class="lab">Change passcode<small>4-digit app lock</small></div><div class="chev">›</div></button>
+        <div class="set-row">
+          <div class="ic">🙂</div><div class="lab">Face ID<small>Unlock with your face</small></div>
+          <div class="toggle ${CONFIG.faceId?"on":""}" data-toggle="faceId"></div></div>
+        <div class="set-row">
+          <div class="ic">🛡️</div><div class="lab">Require passcode to send<small>Confirm identity before transfers</small></div>
+          <div class="toggle ${CONFIG.requirePinToSend?"on":""}" data-toggle="requirePinToSend"></div></div>
+      </div>
+
+      <div class="group-title">Auto-lock</div>
+      <div class="set-group"><div class="set-row" style="flex-direction:column;align-items:stretch;gap:12px">
+        <div class="lab" style="font-weight:600">Lock the app<small>when you leave it — currently ${lockLabels[CONFIG.autoLock]}</small></div>
+        <div class="seg" data-seg="autoLock">
+          ${["immediate","1m","5m","never"].map(v=>`<button data-v="${v}" class="${CONFIG.autoLock===v?"on":""}">${({immediate:"Now","1m":"1 min","5m":"5 min",never:"Never"})[v]}</button>`).join("")}
+        </div></div></div>
+
+      <div class="group-title">Prototype</div>
+      <div class="set-group">
+        <button class="set-row" data-act="lock" style="width:100%;text-align:left">
+          <div class="ic">🔒</div><div class="lab">Lock now</div><div class="chev">›</div></button>
+        <button class="set-row" data-act="reset" style="width:100%;text-align:left">
+          <div class="ic">♻️</div><div class="lab" style="color:var(--danger)">Reset demo data</div><div class="chev">›</div></button>
+      </div>
+      <div style="text-align:center;color:var(--muted);font-size:11.5px;margin-top:6px">Prototype · not a real payment app · rates illustrative</div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- REFERRALS ---------------- */
+function ReferralsScreen(){
+  return `<div class="screen" id="referrals">
+    <div class="statuspad"></div>
+    <div class="topbar"><h1>Referrals</h1></div>
+    <div class="body">
+      <div class="ref-hero">
+        <div class="gift">🎁</div>
+        <h2>Give €5, get €5</h2>
+        <p>Invite a friend to Tap Tap Send. When they make their first transfer, you both earn €5 toward your next send.</p>
+        <div class="ref-code">
+          <span class="code">BADHAN26</span>
+          <button data-act="copycode">Copy</button>
+        </div>
+      </div>
+
+      <div class="section-h"><h2>How it works</h2></div>
+      <div class="ref-step"><div class="n">1</div><div class="rt">Share your code<small>Send BADHAN26 to a friend by any app.</small></div></div>
+      <div class="ref-step"><div class="n">2</div><div class="rt">They sign up &amp; send<small>Your friend makes their first transfer.</small></div></div>
+      <div class="ref-step"><div class="n">3</div><div class="rt">You both get €5<small>Credit lands automatically after delivery.</small></div></div>
+
+      <div style="margin-top:22px"><div class="cta" data-act="sharecode">Share invite</div></div>
+      <div style="text-align:center;color:var(--muted);font-size:11.5px;margin-top:14px">Prototype · rewards illustrative</div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- TAB BAR ---------------- */
+function TabBar(){
+  const ic={
+    home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
+    activity:'<path d="M7 7h11l-3-3M17 17H6l3 3"/>',
+    referrals:'<rect x="4" y="9" width="16" height="12" rx="1.5"/><path d="M4 9h16M12 9v12M12 9S9 3 6.5 4.5 9 9 12 9zM12 9s3-6 5.5-4.5S15 9 12 9z"/>'
+  };
+  const tab=(id,label)=>`<button class="tab ${currentTab===id?"on":""}" data-go="${id}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ic[id]}</svg>${label}</button>`;
+  return `<div class="tabbar">
+    ${tab("home","Home")}
+    <button class="tab send" data-send="new"><div class="fab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M13 5l7 7-7 7"/></svg></div></button>
+    ${tab("activity","Activity")}
+    ${tab("referrals","Referrals")}
+  </div>`;
+}
+
+/* ================================================================
+   MAIN EVENT BINDING
+   ================================================================ */
+function bindMain(){
+  app.querySelectorAll("[data-go]").forEach(el=>el.onclick=()=>{currentTab=el.dataset.go;render();});
+  app.querySelectorAll("[data-send]").forEach(el=>el.onclick=()=>startSend(el.dataset.send));
+  app.querySelectorAll("[data-txn]").forEach(el=>el.onclick=()=>openReceipt(el.dataset.txn));
+  app.querySelectorAll("[data-toggle]").forEach(el=>el.onclick=()=>{
+    const k=el.dataset.toggle; CONFIG[k]=!CONFIG[k]; persist(); render(); haptic();});
+  app.querySelectorAll("[data-seg] button").forEach(b=>b.onclick=()=>{
+    CONFIG[b.parentElement.dataset.seg]=b.dataset.v; persist(); render(); haptic();});
+  app.querySelectorAll("[data-act]").forEach(el=>el.onclick=()=>settingsAction(el.dataset.act));
+
+  // activity search — filters rows live without losing input focus
+  const s=$("#actsearch");
+  if(s) s.oninput=()=>{
+    const q=s.value.trim().toLowerCase();
+    let shown=0;
+    app.querySelectorAll("#actlist .arow").forEach(row=>{
+      const hit=row.dataset.name.includes(q);
+      row.style.display=hit?"":"none"; if(hit)shown++;
+    });
+    const nr=$("#noresults"); if(nr) nr.style.display=(shown===0)?"":"none";
+  };
+}
+
+function settingsAction(a){
+  if(a==="lock") return lock();
+  if(a==="changepin") return openChangePin();
+  if(a==="copycode"){ try{navigator.clipboard&&navigator.clipboard.writeText("BADHAN26");}catch(e){} toast("Code copied"); return; }
+  if(a==="sharecode"){
+    const txt="Join me on Tap Tap Send — use code BADHAN26 and we both get €5.";
+    if(navigator.share){ navigator.share({title:"Tap Tap Send",text:txt}).catch(()=>{}); }
+    else { try{navigator.clipboard&&navigator.clipboard.writeText(txt);}catch(e){} toast("Invite copied"); }
+    return;
+  }
+  if(a==="reset"){ try{localStorage.removeItem("tts_config");localStorage.removeItem("tts_tx");}catch(e){}
+    CONFIG=JSON.parse(JSON.stringify(DEFAULT_CONFIG)); location.reload(); }
+}
+
+/* ================================================================
+   SEND FLOW  (state machine)
+   ================================================================ */
+let flow = null;
+function startSend(toId){
+  if(CONFIG.requirePinToSend && !flow){ /* could gate here; kept simple for proto */ }
+  flow = { step:0, amount:"", to:(toId==="new"?null:toId), method:null };
+  renderFlow();
+}
+function renderFlow(){
+  const steps=[stepAmount,stepRecipient,stepReview,stepTap,stepSuccess];
+  app.innerHTML = steps[flow.step]();
+  bindFlow();
+}
+function flowTop(title){
+  return `<div class="statuspad"></div>
+    <div class="topbar">
+      <button class="iconbtn back" data-flowback>‹</button>
+      <h1 style="font-size:18px">${title}</h1></div>
+    <div class="progress">${[0,1,2,3].map(i=>`<span class="${i<=flow.step?"on":""}"></span>`).join("")}</div>`;
+}
+
+/* step 0 — amount */
+function stepAmount(){
+  const a=flow.amount||"0";
+  const val=parseFloat(a)||0;
+  const they=val*RATE;
+  return `<div class="screen flow" id="flow">${flowTop("Enter amount")}
+    <div class="step">
+      <div class="amt-wrap">
+        <div class="amt-lbl">You send</div>
+        <div class="amt-big tnum"><span class="cur">€</span>${a}</div>
+        <div class="convert">
+          <div class="cline">Exchange rate <b>1 € = ${RATE} ৳</b></div>
+          <div class="cline">Fee <b>${eur(FEE)}</b></div>
+          <div class="cline they"><span>They receive</span><span class="big tnum">${bdt(they)}</span></div>
+        </div>
+      </div>
+      <div class="numpad" id="numpad">
+        ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="nk" data-k="${n}">${n}</button>`).join("")}
+        <button class="nk" data-k=".">.</button>
+        <button class="nk" data-k="0">0</button>
+        <button class="nk" data-k="del">⌫</button>
+      </div>
+    </div>
+    <div class="cta-wrap"><div class="cta ${val>0?"":"disabled"}" data-next>Continue</div></div>
+  </div>`;
+}
+
+/* step 1 — recipient */
+function stepRecipient(){
+  return `<div class="screen flow" id="flow">${flowTop("Who's it for?")}
+    <div class="step rlist">
+      ${RECIPIENTS.map(r=>`
+        <div class="txn ${flow.to===r.id?"sel":""}" data-pick="${r.id}">
+          <div class="ava" style="background:${avColor(r.id)}">${initials(r.name)}</div>
+          <div class="mid"><div class="t1">${r.name}</div>
+            <div class="t2">${r.city} · ${METHOD_ICON[r.method]} ${r.method} ${r.acct}</div></div>
+          <div class="right"><div style="font-size:20px;color:${flow.to===r.id?"var(--pine-bright)":"#d3dad6"}">${flow.to===r.id?"✓":"›"}</div></div>
+        </div>`).join("")}
+    </div>
+    <div class="cta-wrap"><div class="cta ${flow.to?"":"disabled"}" data-next>Continue</div></div>
+  </div>`;
+}
+
+/* step 2 — review */
+function stepReview(){
+  const r=recip(flow.to);
+  const val=parseFloat(flow.amount)||0;
+  const they=val*RATE;
+  const total=val+FEE;
+  const methods=["bKash","Nagad","Bank","Cash pickup"];
+  if(!flow.method) flow.method=r.method;
+  return `<div class="screen flow" id="flow">${flowTop("Review")}
+    <div class="step">
+      <div class="review-card">
+        <div class="rrow"><span class="k">To</span><span class="v">${r.name}<small>${r.city}</small></span></div>
+        <div class="rrow"><span class="k">You send</span><span class="v tnum">${eur(val)}</span></div>
+        <div class="rrow"><span class="k">Fee</span><span class="v tnum">${eur(FEE)}</span></div>
+        <div class="rrow"><span class="k">Rate</span><span class="v tnum">1 € = ${RATE} ৳</span></div>
+        <div class="rrow"><span class="k">They receive</span><span class="v tnum" style="color:var(--pine)">${bdt(they)}</span></div>
+      </div>
+      <div style="margin:18px 4px 0;font-size:13px;font-weight:700;color:var(--muted)">Delivery method</div>
+      <div class="chips" data-methods>
+        ${methods.map(m=>`<button class="chip ${flow.method===m?"on":""}" data-m="${m}">${METHOD_ICON[m]} ${m}</button>`).join("")}
+      </div>
+      <div class="total-card"><span class="k">Total to pay</span><span class="v tnum">${eur(total)}</span></div>
+    </div>
+    <div class="cta-wrap"><div class="cta" data-next>Confirm details</div></div>
+  </div>`;
+}
+
+/* step 3 — the signature TAP TAP */
+let tapCount=0, tapTimer=null;
+function stepTap(){
+  const r=recip(flow.to), val=parseFloat(flow.amount)||0;
+  return `<div class="screen flow" id="flow">${flowTop("Send")}
+    <div class="step tap-step">
+      <div class="tap-lead">Tap tap to send</div>
+      <div class="tap-sub">Double-tap the button to send <b>${eur(val)}</b> to ${r.name}.</div>
+      <button class="tapbtn armed" id="tapbtn">
+        <span class="big tnum">${eur(val)}</span>
+        <span class="sm">tap · tap</span>
+      </button>
+      <div class="tap-counter" id="tapc">Waiting for first tap…</div>
+    </div>
+  </div>`;
+}
+
+/* step 4 — success */
+function stepSuccess(){
+  const r=recip(flow.to), val=parseFloat(flow.amount)||0, they=val*RATE;
+  return `<div class="screen success" id="flow">
+    <div class="statuspad"></div>
+    <div class="step success">
+      <div class="check-wrap"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+      <h2>Money on its way</h2>
+      <p>${bdt(they)} to ${r.name}</p>
+      <div class="receipt">
+        <div class="rrow"><span class="k">Amount</span><span class="v tnum">${eur(val)}</span></div>
+        <div class="rrow"><span class="k">They receive</span><span class="v tnum">${bdt(they)}</span></div>
+        <div class="rrow"><span class="k">Method</span><span class="v">${METHOD_ICON[flow.method]} ${flow.method}</span></div>
+        <div class="rrow"><span class="k">Reference</span><span class="v tnum">#${Math.random().toString(36).slice(2,8).toUpperCase()}</span></div>
+      </div>
+      <div class="cta" style="width:100%;max-width:320px" data-done>Done</div>
+    </div>
+  </div>`;
+}
+
+function bindFlow(){
+  const back=$("[data-flowback]"); if(back) back.onclick=()=>{ if(flow.step===0){flow=null;render();}else{flow.step--;renderFlow();} };
+  const next=$("[data-next]"); if(next) next.onclick=()=>advance();
+  const done=$("[data-done]"); if(done) done.onclick=()=>{ flow=null; currentTab="home"; render(); };
+
+  // amount numpad
+  const np=$("#numpad");
+  if(np) np.onclick=e=>{ const b=e.target.closest("button"); if(!b)return; haptic();
+    const k=b.dataset.k; let a=flow.amount;
+    if(k==="del") a=a.slice(0,-1);
+    else if(k==="."){ if(!a.includes(".")) a=(a||"0")+"."; }
+    else { if(a==="0")a=""; if((a.split(".")[1]||"").length>=2)return; if(a.replace(".","").length>=6)return; a+=k; }
+    flow.amount=a; renderFlow(); };
+
+  // recipient pick
+  app.querySelectorAll("[data-pick]").forEach(el=>el.onclick=()=>{flow.to=el.dataset.pick;flow.method=null;renderFlow();haptic();});
+  // method chips
+  app.querySelectorAll("[data-m]").forEach(el=>el.onclick=()=>{flow.method=el.dataset.m;renderFlow();haptic();});
+
+  // TAP TAP handler
+  const tb=$("#tapbtn");
+  if(tb){ tapCount=0;
+    tb.onclick=(e)=>{
+      haptic(15);
+      // ripple
+      const rp=document.createElement("span"); rp.className="ripple";
+      const rect=tb.getBoundingClientRect(); const size=Math.max(rect.width,rect.height);
+      rp.style.width=rp.style.height=size+"px";
+      rp.style.left=(e.clientX-rect.left-size/2)+"px"; rp.style.top=(e.clientY-rect.top-size/2)+"px";
+      tb.appendChild(rp); setTimeout(()=>rp.remove(),600);
+
+      tapCount++;
+      const c=$("#tapc");
+      if(tapCount===1){ c.textContent="Tap once more to confirm"; tb.classList.remove("armed");
+        clearTimeout(tapTimer); tapTimer=setTimeout(()=>{ tapCount=0; c.textContent="Waiting for first tap…"; tb.classList.add("armed"); },900);
+      } else if(tapCount>=2){ clearTimeout(tapTimer); haptic([20,40,60]); commitSend(); }
+    };
+  }
+}
+
+function advance(){
+  if(flow.step===0){ if((parseFloat(flow.amount)||0)<=0) return; flow.step=1; }
+  else if(flow.step===1){ if(!flow.to) return; flow.step=2; }
+  else if(flow.step===2){ flow.step=3; }
+  renderFlow();
+}
+
+function commitSend(){
+  const val=parseFloat(flow.amount)||0;
+  const tx={ id:"t"+Date.now(), to:flow.to, amountEUR:val, method:flow.method, date:new Date().toISOString().slice(0,10), status:"ok" };
+  TRANSACTIONS.unshift(tx);
+  recomputeTotals();
+  persist();
+  flow.step=4; renderFlow();
+}
+
+/* ================================================================
+   RECEIPT (tap a history item)
+   ================================================================ */
+function openReceipt(id){
+  const t=TRANSACTIONS.find(x=>x.id===id); if(!t)return;
+  const r=recip(t.to), they=t.amountEUR*RATE, s=STATUS[t.status];
+  const scrim=document.createElement("div"); scrim.className="sheet-scrim";
+  scrim.innerHTML=`<div class="sheet" onclick="event.stopPropagation()">
+    <div style="text-align:center;margin-bottom:6px">
+      <div class="ava" style="width:56px;height:56px;margin:0 auto 10px;background:${avColor(t.to)}">${initials(r.name)}</div>
+      <div style="font-weight:800;font-size:18px">${eur(t.amountEUR)}</div>
+      <span class="pill ${s.c}">${s.t}</span>
+    </div>
+    <div class="review-card" style="box-shadow:none;background:var(--bg);margin-top:14px">
+      <div class="rrow"><span class="k">To</span><span class="v">${r.name}<small>${r.city}</small></span></div>
+      <div class="rrow"><span class="k">They receive</span><span class="v tnum">${bdt(they)}</span></div>
+      <div class="rrow"><span class="k">Method</span><span class="v">${METHOD_ICON[t.method]} ${t.method}</span></div>
+      <div class="rrow"><span class="k">Date</span><span class="v">${fmtDate(t.date)}</span></div>
+      <div class="rrow"><span class="k">Reference</span><span class="v tnum">#${t.id.slice(-6).toUpperCase()}</span></div>
+    </div>
+    <div class="cta" style="margin-top:16px" onclick="this.closest('.sheet-scrim').remove()">Close</div>
+  </div>`;
+  scrim.onclick=()=>scrim.remove();
+  app.appendChild(scrim); requestAnimationFrame(()=>{scrim.classList.add("on");scrim.querySelector(".sheet").classList.add("on");});
+}
+
+/* ================================================================
+   CHANGE PIN sheet
+   ================================================================ */
+function openChangePin(){
+  let phase="new", buf="", first="";
+  const scrim=document.createElement("div"); scrim.className="sheet-scrim";
+  scrim.innerHTML=`<div class="sheet" onclick="event.stopPropagation()">
+    <h3 id="cp-t">Set a new passcode</h3><p id="cp-p">Choose 4 digits</p>
+    <div class="dots" id="cp-dots">${[0,1,2,3].map(()=>`<div class="dot"></div>`).join("")}</div>
+    <div class="keypad" id="cp-pad">
+      ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="key" data-n="${n}">${n}</button>`).join("")}
+      <button class="key blank"></button><button class="key" data-n="0">0</button>
+      <button class="key util" data-act="del">Delete</button>
+    </div></div>`;
+  scrim.onclick=()=>scrim.remove();
+  app.appendChild(scrim);
+  const dots=scrim.querySelector("#cp-dots");
+  const draw=()=>[...dots.children].forEach((d,i)=>d.classList.toggle("on",i<buf.length));
+  scrim.querySelector("#cp-pad").addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b||b.classList.contains("blank"))return; haptic();
+    if(b.dataset.act==="del"){buf=buf.slice(0,-1);draw();return;}
+    if(buf.length>=4)return; buf+=b.dataset.n; draw();
+    if(buf.length===4){ setTimeout(()=>{
+      if(phase==="new"){ first=buf; buf=""; phase="confirm";
+        scrim.querySelector("#cp-t").textContent="Confirm passcode";
+        scrim.querySelector("#cp-p").textContent="Enter the same 4 digits again"; draw();
+      } else {
+        if(buf===first){ CONFIG.pin=first; persist(); scrim.remove(); toast("Passcode updated"); }
+        else{ dots.classList.add("err"); haptic(200);
+          setTimeout(()=>{buf="";first="";phase="new";dots.classList.remove("err");
+            scrim.querySelector("#cp-t").textContent="Set a new passcode";
+            scrim.querySelector("#cp-p").textContent="Didn't match — try again"; draw();},600); }
+      }
+    },120); }
+  });
+  requestAnimationFrame(()=>{scrim.classList.add("on");scrim.querySelector(".sheet").classList.add("on");});
+}
+
+/* misc svg */
+function faceSvg(){return `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M9 10v1M15 10v1M12 9v3l-1 1M9 15c1.5 1.2 4.5 1.2 6 0"/></svg>`;}
+
+/* boot */
+render();
+</script>
+</body>
+</html>
